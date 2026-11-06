@@ -1,6 +1,8 @@
 services:
   sim:
-    build: ./sim
+    build:
+      context: ./sim
+      dockerfile: docker/Dockerfile
     image: roboops-sim:humble
     container_name: roboops-sim
     ports:

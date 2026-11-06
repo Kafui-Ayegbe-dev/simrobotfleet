@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ros-humble-rviz2 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY roboops_sim.launch.py /opt/roboops/roboops_sim.launch.py
+COPY launch/roboops_sim.launch.py /opt/roboops/roboops_sim.launch.py
 
 # Convenience: `start-sim` from any terminal inside the VNC desktop
 RUN echo 'source /opt/ros/humble/setup.bash' >> /etc/bash.bashrc && \

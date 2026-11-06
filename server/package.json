@@ -1,14 +1,15 @@
 {
   "name": "roboops-server",
   "version": "0.1.0",
-  "description": "RoboOps fleet backend — Milestone 1: drive one simulated TurtleBot3 over HTTP",
+  "description": "RoboOps fleet backend: drive simulated TurtleBot3 robots over HTTP via rosbridge",
   "type": "module",
   "main": "src/index.js",
   "engines": { "node": ">=18" },
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "mock": "node tools/mock-rosbridge.js"
+    "mock": "node tools/mock-rosbridge.js",
+    "test": "node --test"
   },
   "dependencies": {
     "express": "^4.21.2",

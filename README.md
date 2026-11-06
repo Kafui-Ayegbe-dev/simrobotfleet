@@ -1,44 +1,47 @@
 # RoboOps
 
-Robot fleet management with Node.js + ROS 2. Milestone 1: drive one simulated TurtleBot3 over HTTP and read back its pose.
-
-```
-curl / browser ──HTTP──▶ Node (Express, :3000) ──WebSocket──▶ rosbridge (:9090) ──ROS 2──▶ turtlebot3_fake_node
-                                    ▲                                                          │
-                                    └──────────────────────── /odom ◀──────────────────────────┘
-```
+Robot fleet management with Node.js + ROS 2. It currently drives one simulated TurtleBot3 over HTTP and reports its position. See [docs/roadmap.md](docs/roadmap.md) for what's next and [docs/architecture.md](docs/architecture.md) for how it fits together.
 
 Runs on Apple Silicon. It uses `turtlebot3_fake_node` (a kinematic sim) because Gazebo doesn't run on ARM64.
+
+## Project structure
+
+```
+roboops/
+├── docker-compose.yml          # runs the sim container
+├── docs/                       # architecture + roadmap
+├── sim/                        # ROS 2 side (runs in Docker)
+│   ├── docker/Dockerfile
+│   └── launch/roboops_sim.launch.py
+└── server/                     # Node.js backend (runs on your Mac)
+    ├── src/
+    │   ├── index.js            # entry point
+    │   ├── app.js              # Express app wiring
+    │   ├── config/             # settings + robot limits
+    │   ├── api/                # routes, validators, middleware
+    │   ├── robots/             # Robot model and state
+    │   ├── ros/                # rosbridge client + message helpers
+    │   └── utils/
+    ├── test/                   # API tests (use the mock bridge)
+    └── tools/mock-rosbridge.js # fake ROS for testing without Docker
+```
 
 ## Setup (one time)
 
 Requires Docker Desktop and Node 18+.
 
 ```bash
-# from the repo root
-docker compose build          # bakes ROS packages into the image (~5 min first time)
+docker compose build          # bakes ROS packages into the image
 cd server && npm install
 ```
 
 ## Run
 
-**1. Start the container**
-```bash
-docker compose up -d
-```
+1. Start the container with `docker compose up -d`.
+2. **Start the sim**: open http://localhost:6080, open a terminal in that desktop, and run `start-sim`.
+3. **Start the server** in a Mac terminal with `cd server && npm start`. Expect `[rosbridge] connected`.
+4. **Drive it** from a second Mac terminal tab:
 
-**2. Start the sim.** Open http://localhost:6080, open a terminal in the desktop, and run:
-```bash
-start-sim                     # fake node + robot_state_publisher + rosbridge + RViz
-```
-You should see the burger robot in RViz and `Rosbridge WebSocket server started on port 9090` in the logs.
-
-**3. Start the server.** In a Mac terminal:
-```bash
-cd server && npm start        # expect: [rosbridge] connected to ws://localhost:9090
-```
-
-**4. Drive it.**
 ```bash
 curl localhost:3000/robot/status
 
@@ -53,38 +56,29 @@ curl -X POST localhost:3000/robot/move \
 curl -X POST localhost:3000/robot/stop
 ```
 
-Milestone 1 is done when the robot moves in RViz and `/robot/status` shows the new pose.
-
-**Stop everything:** `docker compose down` (the image is kept, so the next `up` is instant).
+Stop everything with `docker compose down`.
 
 ## API
 
 | Method | Path | Body | Notes |
 |---|---|---|---|
 | GET | `/health` | | Server and rosbridge connection |
-| GET | `/robot/status` | | `state`: `idle` / `moving` / `stale` / `disconnected`, plus pose (x, y, yaw) and velocity |
-| POST | `/robot/move` | `{linear, angular, durationMs}` | Limits: ±0.22 m/s, ±2.84 rad/s, ≤10 s. Publishes at 10 Hz, then sends a zero Twist. A new move replaces the current one. Returns 503 if the bridge is down |
-| POST | `/robot/stop` | | Immediate zero Twist |
+| GET | `/robot/status` | | `state` (`idle` / `moving` / `stale` / `disconnected`), pose (x, y, heading in degrees), velocity |
+| POST | `/robot/move` | `{linear, angular, durationMs}` | Limits: ±0.22 m/s, ±2.84 rad/s, ≤10 s. Auto-stops at the end. A new move replaces the current one |
+| POST | `/robot/stop` | | Immediate stop |
 
-## Testing without ROS
+## Testing
 
 ```bash
 cd server
-npm run mock      # terminal 1: fake rosbridge that simulates /odom
-npm start         # terminal 2
+npm test          # automated API tests against the mock bridge (no Docker needed)
+npm run mock      # or run the mock manually, then `npm start` in another tab
 ```
 
 ## Troubleshooting
 
-- **Server says `ECONNREFUSED`**: rosbridge isn't up. Check that `start-sim` is running and port 9090 is mapped (`docker ps`).
+- **`ECONNREFUSED`**: rosbridge isn't up. Check that `start-sim` is running and that `docker ps` shows port 9090.
 - **`stale` state**: the bridge is connected but no `/odom` is arriving, so the fake node isn't running.
-- **Robot doesn't move in RViz**: set Fixed Frame to `odom` in RViz.
-- **Changed the Dockerfile or launch file?** Run `docker compose build && docker compose up -d --force-recreate`.
-
-## Layout
-
-```
-sim/       Dockerfile + roboops_sim.launch.py (the ROS side)
-server/    Node backend: rosbridge client, Robot model, Express API, mock bridge
-```
-# robotfleet
+- **Robot doesn't move in RViz**: set Fixed Frame to `odom`.
+- **Position reset to 0**: the sim was restarted. The fake node always starts at the origin.
+- **Changed anything in `sim/`?** Run `docker compose build && docker compose up -d --force-recreate`.
