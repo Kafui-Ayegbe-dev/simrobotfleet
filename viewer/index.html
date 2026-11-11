@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RoboOps Viewer</title>
+  <link rel="stylesheet" href="css/viewer.css" />
+
+  <!-- three.js is served by the RoboOps server from node_modules -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "/vendor/three/build/three.module.js",
+        "three/addons/": "/vendor/three/examples/jsm/"
+      }
+    }
+  </script>
+  <!-- Socket.IO client is served automatically by the Socket.IO server -->
+  <script src="/socket.io/socket.io.min.js"></script>
+</head>
+<body>
+  <div id="hud" class="hud">
+    <header class="hud__header">
+      <span class="hud__title">RoboOps</span>
+      <span id="conn" class="pill pill--off">connecting</span>
+    </header>
+    <div id="robots" class="hud__robots"></div>
+    <label class="hud__toggle">
+      <input id="follow" type="checkbox" /> Follow robot
+    </label>
+  </div>
+
+  <div class="hint">Drag to orbit · Right-drag to pan · Scroll to zoom</div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

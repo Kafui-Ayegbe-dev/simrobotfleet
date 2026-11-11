@@ -1,0 +1,105 @@
+:root {
+  --bg: #0e1116;
+  --panel: rgba(20, 24, 31, 0.82);
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #e6e9ef;
+  --muted: #8a93a3;
+  --idle: #3fb950;
+  --moving: #4c9aff;
+  --stale: #d29922;
+  --off: #f85149;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+canvas { display: block; }
+
+.hud {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  width: 240px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+  user-select: none;
+}
+
+.hud__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.hud__title { font-weight: 600; letter-spacing: 0.02em; }
+
+.hud__robots { display: grid; gap: 10px; }
+
+.robot__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.robot__id { font-weight: 600; }
+
+.robot__grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 12px;
+  row-gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.robot__grid dt { color: var(--muted); }
+.robot__grid dd { margin: 0; text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.hud__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.pill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #0e1116;
+}
+.pill--idle { background: var(--idle); }
+.pill--moving { background: var(--moving); }
+.pill--stale { background: var(--stale); }
+.pill--off, .pill--disconnected { background: var(--off); }
+.pill--live { background: var(--idle); }
+
+.hint {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  color: var(--muted);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.empty { color: var(--muted); }

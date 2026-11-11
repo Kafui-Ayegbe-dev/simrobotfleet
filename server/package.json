@@ -4,15 +4,22 @@
   "description": "RoboOps fleet backend: drive simulated TurtleBot3 robots over HTTP via rosbridge",
   "type": "module",
   "main": "src/index.js",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "mock": "node tools/mock-rosbridge.js",
-    "test": "node --test"
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "express": "^4.21.2",
+    "socket.io": "^4.8.4",
+    "three": "^0.170.0",
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.4"
   }
 }

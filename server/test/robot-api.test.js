@@ -1,36 +1,14 @@
 // End-to-end API test against the mock rosbridge. Run: npm test
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { once } from "node:events";
-import { startMockRosbridge } from "../tools/mock-rosbridge.js";
-import { RosBridge } from "../src/ros/rosbridge.js";
-import { Robot } from "../src/robots/Robot.js";
-import { createApp } from "../src/app.js";
+import { startStack, sleep } from "./helpers.js";
 
-const MOCK_PORT = 19090;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-let mock, bridge, server, base;
-
+let stack, base;
 before(async () => {
-  mock = startMockRosbridge(MOCK_PORT);
-  bridge = new RosBridge(`ws://localhost:${MOCK_PORT}`, { reconnectMs: 100 });
-  bridge.connect();
-  await once(bridge, "connected");
-
-  const robot = new Robot("tb3_0", bridge);
-  server = createApp({ bridge, robot }).listen(0);
-  await once(server, "listening");
-  base = `http://localhost:${server.address().port}`;
-  await sleep(200); // let first /odom arrive
+  stack = await startStack({ mockPort: 19090 });
+  base = stack.base;
 });
-
-after(async () => {
-  bridge.removeAllListeners();
-  bridge.connect = () => {}; // stop reconnect loop
-  bridge.ws?.terminate();
-  server.close();
-  await mock.close();
-});
+after(() => stack.stop());
 
 const post = (path, body) =>
   fetch(base + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
