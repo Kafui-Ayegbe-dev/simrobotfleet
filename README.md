@@ -22,7 +22,9 @@ roboops/
     │   ├── api/                # routes, validators, middleware
     │   ├── robots/             # Robot model and state
     │   ├── ros/                # rosbridge client + message helpers
-    │   ├── realtime/           # Socket.IO live status push
+    │   ├── realtime/           # Socket.IO live status + mission events
+    │   ├── missions/           # mission queue and lifecycle
+    │   ├── telemetry/          # rolling pose history
     │   └── utils/
     ├── test/                   # API tests (use the mock bridge)
     └── tools/mock-rosbridge.js # fake ROS for testing without Docker
@@ -88,8 +90,30 @@ In VR, the robot area appears about 1 m in front of you at real scale, with a fl
 | GET | `/robot/status` | | `state` (`idle` / `moving` / `stale` / `disconnected`), pose (x, y, heading in degrees), velocity |
 | POST | `/robot/move` | `{linear, angular, durationMs}` | Limits: ±0.22 m/s, ±2.84 rad/s, ≤10 s. Auto-stops at the end. A new move replaces the current one |
 | POST | `/robot/stop` | | Immediate stop |
+| GET | `/robot/telemetry` | | Recent pose history, oldest first. `?since=` (ISO or ms) and `?limit=` (1–3000). Sampled at 5 Hz, last 10 min kept |
+| POST | `/missions` | `{x, y, robotId?}` | Go-to-goal mission. Goal within ±5 m. Starts if the robot is free, otherwise queues. `robotId` defaults to `tb3_0` |
+| GET | `/missions` | | All missions, newest first. Filters: `?state=` and `?robotId=` |
+| GET | `/missions/:id` | | One mission, with its state history (and `queuePosition` if queued) |
+| POST | `/missions/:id/cancel` | | Cancel a queued or active mission. 409 if it's already finished |
 | GET | `/viewer/` | | 3D / VR viewer |
-| WS | `/socket.io` | | Event `robots:status` → array of robot statuses, ~10 Hz |
+| WS | `/socket.io` | | `robots:status` (array, ~10 Hz), `missions:snapshot` (on connect), `missions:update` (on every change) |
+
+## Missions
+
+A mission asks a robot to go to a point. Each robot runs one at a time, and the rest wait in a queue:
+
+```
+queued ──▶ active ──▶ succeeded | failed | cancelled
+   └──────────────────▶ cancelled
+```
+
+```bash
+curl -X POST localhost:3000/missions -H 'Content-Type: application/json' -d '{"x":1.5,"y":0.5}'
+curl localhost:3000/missions?state=active
+curl -X POST localhost:3000/missions/m-0001/cancel
+```
+
+**For now, missions are tracked but don't drive the robot.** An active mission stays active until you cancel it. Milestone 3 adds the navigation that makes the robot drive to the goal and marks the mission succeeded or failed. Missions and telemetry are kept in memory, so they reset when the server restarts.
 
 ## Testing
 

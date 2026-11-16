@@ -22,6 +22,22 @@ export const ROBOT = {
   staleMs: 2000,       // no /odom for this long => state is "stale"
 };
 
+// Goals must fall inside this square around the odom origin (metres).
+// Matches the 10 m x 10 m floor in the viewer.
+export const WORLD = {
+  halfSize: 5,
+};
+
+export const MISSIONS = {
+  keepFinished: 200,   // finished missions kept in memory (oldest dropped first)
+};
+
+export const TELEMETRY = {
+  sampleHz: 5,         // poses recorded per second per robot
+  capacity: 3000,      // samples kept per robot (3000 at 5 Hz = 10 minutes)
+  maxQueryLimit: 3000,
+};
+
 export const REALTIME = {
   statusHz: 10,        // how often robot status is pushed to connected viewers
 };

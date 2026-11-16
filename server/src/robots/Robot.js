@@ -1,11 +1,16 @@
 // One robot: turns API-level commands into ROS messages and
 // keeps the latest known state from /odom.
+//
+// Events:
+//   "odom" ({ pose, velocity, at })  every time a new /odom message arrives
+import { EventEmitter } from "node:events";
 import { ROBOT } from "../config/index.js";
 import { TYPES, twist, parseOdometry } from "../ros/messages.js";
 import { round, toHeadingDeg, iso } from "../utils/format.js";
 
-export class Robot {
+export class Robot extends EventEmitter {
   constructor(id, bridge, { namespace = "" } = {}) {
+    super();
     this.id = id;
     this.bridge = bridge;
     this.cmdTopic = `${namespace}/cmd_vel`;
@@ -20,6 +25,7 @@ export class Robot {
     bridge.subscribe(this.odomTopic, TYPES.odometry, (msg) => {
       Object.assign(this, parseOdometry(msg));
       this.lastOdomAt = Date.now();
+      this.emit("odom", { pose: this.pose, velocity: this.velocity, at: this.lastOdomAt });
     });
   }
 

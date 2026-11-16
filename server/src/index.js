@@ -1,4 +1,5 @@
-// Entry point: connect to rosbridge, create the robot, start the HTTP(S) server.
+// Entry point: connect to rosbridge, create the robot, missions and telemetry,
+// then start the HTTP(S) server.
 import fs from "node:fs";
 import http from "node:http";
 import https from "node:https";
@@ -8,6 +9,8 @@ import { RosBridge } from "./ros/rosbridge.js";
 import { Robot } from "./robots/Robot.js";
 import { createApp } from "./app.js";
 import { attachRealtime } from "./realtime/socket.js";
+import { MissionManager } from "./missions/MissionManager.js";
+import { TelemetryBuffer } from "./telemetry/TelemetryBuffer.js";
 
 const bridge = new RosBridge(config.rosbridgeUrl, { reconnectMs: config.rosbridgeReconnectMs });
 bridge.on("connected", () => console.log(`[rosbridge] connected to ${config.rosbridgeUrl}`));
@@ -16,14 +19,19 @@ bridge.on("error", (e) => console.warn(`[rosbridge] ${e.code ?? e.message}`));
 bridge.connect();
 
 const robot = new Robot("tb3_0", bridge);
-const app = createApp({ bridge, robot });
+const robots = [robot];
+const telemetry = new TelemetryBuffer({ robots });
+const missions = new MissionManager({ robots });
+missions.on("update", (m) => console.log(`[mission] ${m.id} ${m.state} -> (${m.goal.x}, ${m.goal.y})`));
+
+const app = createApp({ bridge, robot, missions, telemetry });
 
 const useHttps = Boolean(config.httpsKey && config.httpsCert);
 const server = useHttps
   ? https.createServer({ key: fs.readFileSync(config.httpsKey), cert: fs.readFileSync(config.httpsCert) }, app)
   : http.createServer(app);
 
-attachRealtime(server, { robots: [robot] });
+attachRealtime(server, { robots, missions });
 
 server.listen(config.port, () => {
   const scheme = useHttps ? "https" : "http";

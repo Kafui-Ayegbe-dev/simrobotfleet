@@ -18,7 +18,9 @@ Each layer only depends on the layers below it.
 | Layer | Folder | Responsibility |
 |---|---|---|
 | API | `src/api/` | HTTP routes, request validation, response formatting. No ROS knowledge. |
-| Realtime | `src/realtime/` | Socket.IO: broadcasts `robots:status` (an array, ready for a fleet) to viewers. |
+| Realtime | `src/realtime/` | Socket.IO: broadcasts `robots:status` (an array, ready for a fleet) and mission events to clients. |
+| Missions | `src/missions/` | `MissionManager`: per-robot FIFO queue, lifecycle (`queued → active → succeeded/failed/cancelled`), emits `update`. |
+| Telemetry | `src/telemetry/` | `TelemetryBuffer`: fixed-size ring buffer of poses per robot, sampled at 5 Hz from the robot's `odom` events. |
 | Domain | `src/robots/` | `Robot`: commands, state machine (`idle` / `moving` / `stale` / `disconnected`), latest pose. |
 | ROS | `src/ros/` | `RosBridge` WebSocket client (reconnects automatically) and message helpers (`Twist`, `Odometry`). |
 | Shared | `src/config/`, `src/utils/` | Settings, hardware limits, formatting helpers. |
@@ -29,8 +31,7 @@ Each layer only depends on the layers below it.
 
 | Milestone | Lands in |
 |---|---|
-| 2: Telemetry, missions, live updates | `src/missions/`, `src/telemetry/`, new events in `src/realtime/`, new routes in `src/api/routes/` |
-| 3: Autonomous navigation | `src/navigation/` (go-to-goal controller) |
+| 3: Autonomous missions | `/robots/:id` routes in `src/api/routes/`, goal markers and mission list in `viewer/`, and `src/navigation/`: a go-to-goal controller plugged into `MissionManager` as its executor |
 | 4: Dashboard | `dashboard/` (React + TypeScript) at the repo root, which can embed the 3D view from `viewer/` |
 | 5: Failure handling | `src/robots/` and `src/missions/` |
 | 6: Multiple robots | `src/robots/RobotRegistry.js`, namespaced sims in `sim/launch/` |
@@ -38,3 +39,16 @@ Each layer only depends on the layers below it.
 ## Viewer coordinates
 
 ROS uses x forward, y left, z up. three.js uses y up. The viewer maps ROS `(x, y)` to three `(x, 0, -y)`, and ROS yaw to `rotation.y`. See `viewer/js/scene.js`.
+
+## How missions will drive the robot
+
+`MissionManager` doesn't know how to move a robot. It hands each active mission to an **executor**:
+
+```js
+executor(mission, { robot, signal }) -> Promise
+// resolve       -> mission succeeded
+// reject(err)   -> mission failed (err.message kept)
+// signal abort  -> mission cancelled: stop the robot and return
+```
+
+The current default executor just waits until the mission is cancelled. Milestone 3 swaps in a go-to-goal controller, and nothing else in the mission system needs to change.
