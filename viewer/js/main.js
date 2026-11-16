@@ -15,7 +15,14 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
 renderer.xr.setReferenceSpaceType("local-floor");
 document.body.appendChild(renderer.domElement);
-document.body.appendChild(VRButton.createButton(renderer));
+// "Enter VR" button. Hidden on devices without VR (e.g. a laptop), so it
+// only appears on a headset.
+const vrButton = VRButton.createButton(renderer);
+vrButton.style.display = "none";
+document.body.appendChild(vrButton);
+navigator.xr?.isSessionSupported("immersive-vr")
+  .then((ok) => { vrButton.style.display = ok ? "" : "none"; })
+  .catch(() => {});
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0e1116);
