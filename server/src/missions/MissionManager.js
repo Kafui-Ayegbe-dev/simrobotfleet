@@ -13,8 +13,9 @@
 //     reject(err)    => mission "failed" (err.message is kept)
 //     signal aborted => mission was cancelled; stop the robot and return
 //
-// Until autonomous navigation exists (Milestone 3), the default executor just
-// waits, so a mission stays "active" until it is cancelled.
+// The server uses the go-to-goal executor (src/navigation/goToGoal.js), which
+// actually drives the robot. The built-in default just waits until cancelled,
+// which is handy in tests.
 //
 // Events:
 //   "update" (mission)   whenever a mission is created or changes state
@@ -104,6 +105,21 @@ export class MissionManager extends EventEmitter {
       this.active.get(mission.robotId)?.controller.abort();
     }
     return mission;
+  }
+
+  /** The mission currently driving this robot, or null. */
+  activeFor(robotId) {
+    const a = this.active.get(robotId);
+    return a ? this.missions.get(a.id) : null;
+  }
+
+  /** Emergency stop: cancel everything queued for this robot, then the active mission. */
+  cancelAll(robotId) {
+    const ids = [...this.#queue(robotId)];
+    const active = this.active.get(robotId);
+    for (const id of ids) this.cancel(id);
+    if (active) this.cancel(active.id);
+    return active ? [active.id, ...ids] : ids;
   }
 
   #queue(robotId) {

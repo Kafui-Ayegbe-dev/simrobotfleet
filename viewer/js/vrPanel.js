@@ -22,7 +22,7 @@ export class VRPanel {
     this.lastDraw = 0;
   }
 
-  draw(statuses, live, now = performance.now()) {
+  draw(statuses, live, missionLayer, now = performance.now()) {
     if (!this.mesh.visible || now - this.lastDraw < 200) return; // ~5 Hz is plenty
     this.lastDraw = now;
     const c = this.ctx;
@@ -59,8 +59,10 @@ export class VRPanel {
         ["y", `${(p.y ?? 0).toFixed(2)} m`],
         ["heading", `${(p.heading ?? 0).toFixed(1)}°`],
       ];
+      const goal = missionLayer?.activeFor(s.id);
+      rows.push(["mission", goal ? `${goal.id} → (${goal.goal.x.toFixed(1)}, ${goal.goal.y.toFixed(1)})` : "none"]);
       rows.forEach(([k, v], i) => {
-        const y = 190 + i * 52;
+        const y = 180 + i * 50;
         c.fillStyle = "#8a93a3";
         c.fillText(k, 32, y);
         c.fillStyle = "#e6e9ef";

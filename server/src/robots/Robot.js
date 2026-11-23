@@ -19,7 +19,9 @@ export class Robot extends EventEmitter {
     this.pose = null;       // { x, y, yaw }
     this.velocity = null;   // { linear, angular } as reported by odom
     this.lastOdomAt = null;
-    this.activeMove = null; // { linear, angular, endsAt, timer }
+    this.activeMove = null; // { linear, angular, endsAt, timer }  (timed /move)
+    this.lastCmd = null;    // { linear, angular, at }  (streamed by navigation)
+    this.missionId = null;  // set while a mission is driving this robot
 
     bridge.advertise(this.cmdTopic, TYPES.twist);
     bridge.subscribe(this.odomTopic, TYPES.odometry, (msg) => {
@@ -47,8 +49,20 @@ export class Robot extends EventEmitter {
     return { linear, angular, durationMs, endsAt: iso(endsAt) };
   }
 
+  /**
+   * Send one velocity command, with no timer. Used by navigation, which calls
+   * this every control tick, so if the caller stops calling, the robot gets no
+   * new commands. Returns false if the bridge is down.
+   */
+  setVelocity(linear, angular) {
+    this.#clearMove();
+    this.lastCmd = { linear, angular, at: Date.now() };
+    return this.bridge.publish(this.cmdTopic, twist(linear, angular));
+  }
+
   stop() {
     this.#clearMove();
+    this.lastCmd = null;
     return this.bridge.publish(this.cmdTopic, twist(0, 0));
   }
 
@@ -57,10 +71,16 @@ export class Robot extends EventEmitter {
     this.activeMove = null;
   }
 
+  /** True if odom is arriving and the bridge is up. */
+  get healthy() {
+    return this.bridge.connected && !!this.lastOdomAt && Date.now() - this.lastOdomAt <= ROBOT.staleMs;
+  }
+
   get state() {
     if (!this.bridge.connected) return "disconnected";
-    if (!this.lastOdomAt || Date.now() - this.lastOdomAt > ROBOT.staleMs) return "stale";
-    return this.activeMove ? "moving" : "idle";
+    if (!this.healthy) return "stale";
+    const streaming = this.lastCmd && Date.now() - this.lastCmd.at < 500 && (this.lastCmd.linear || this.lastCmd.angular);
+    return this.activeMove || streaming ? "moving" : "idle";
   }
 
   status() {
@@ -80,6 +100,7 @@ export class Robot extends EventEmitter {
       lastUpdate: iso(this.lastOdomAt),
     };
 
+    if (this.missionId) out.mission = this.missionId;
     if (this.activeMove) {
       out.command = {
         linear: this.activeMove.linear,

@@ -25,12 +25,17 @@
       <span id="conn" class="pill pill--off">connecting</span>
     </header>
     <div id="robots" class="hud__robots"></div>
+    <section class="hud__section">
+      <div class="hud__section-title">Missions</div>
+      <ol id="missions" class="missions"></ol>
+    </section>
     <label class="hud__toggle">
       <input id="follow" type="checkbox" /> Follow robot
     </label>
   </div>
 
-  <div class="hint">Drag to orbit · Right-drag to pan · Scroll to zoom</div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div class="hint">Double-click the floor to send the robot · Drag to orbit · Right-drag to pan · Scroll to zoom</div>
 
   <script type="module" src="js/main.js"></script>
 </body>

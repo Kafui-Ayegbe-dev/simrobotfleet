@@ -1,7 +1,8 @@
 // Drives the robot along a smiley-face outline using /robot/move and /robot/status.
 // Watch it in the viewer (top-down view looks best).
 //
-//   node tools/draw-smiley.js                 # server on localhost:3000
+//   node tools/draw-smiley.js                 # drive it step by step from this script
+//   node tools/draw-smiley.js --missions      # queue every point as a mission instead
 //   node tools/draw-smiley.js http://host:3000
 //
 // Coordinates are in metres in the ROS odom frame. The face is centred on the
@@ -9,10 +10,15 @@
 //
 // This steers point to point: turn on the spot toward the next waypoint, then
 // drive straight, re-reading the pose each time so small errors don't build up.
+// With --missions, the script just queues each point as a mission and exits;
+// the server's navigation drives the robot through them in order.
+//
 // There's no "pen up", so the short travel lines between the face, eyes and
-// mouth show in the trail. Milestone 3 will replace this with real missions.
+// mouth show in the trail.
 
-const BASE = process.argv[2] ?? "http://localhost:3000";
+const args = process.argv.slice(2);
+const AS_MISSIONS = args.includes("--missions");
+const BASE = args.find((a) => !a.startsWith("--")) ?? "http://localhost:3000";
 const LINEAR = 0.2;   // m/s (robot max 0.22)
 const ANGULAR = 1.5;  // rad/s (robot max 2.84)
 const SETTLE_MS = 150;
@@ -65,6 +71,23 @@ const SHAPES = [
   ["left eye", arc(-0.35, 0.3, 0.1, 180, 540, 6)],
   ["mouth", arc(0, 0, 0.55, 200, 340, 8)],
 ];
+
+if (AS_MISSIONS) {
+  let count = 0;
+  for (const [, points] of SHAPES) {
+    for (const [x, y] of points) {
+      const res = await fetch(`${BASE}/missions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ x: Number(x.toFixed(3)), y: Number(y.toFixed(3)) }),
+      });
+      if (!res.ok) throw new Error(`mission failed: ${res.status} ${await res.text()}`);
+      count++;
+    }
+  }
+  console.log(`Queued ${count} missions. Watch the viewer; cancel all with: curl -X POST ${BASE}/robots/tb3_0/stop`);
+  process.exit(0);
+}
 
 const started = Date.now();
 for (const [name, points] of SHAPES) {

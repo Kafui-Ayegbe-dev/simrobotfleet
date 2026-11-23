@@ -14,14 +14,35 @@ const VIEWER_DIR = path.resolve(here, "../../viewer");
 // three.js is served from node_modules, so the viewer needs no CDN or build step
 const THREE_DIR = path.resolve(path.dirname(createRequire(import.meta.url).resolve("three")), "..");
 
-export function createApp({ bridge, robot, missions, telemetry }) {
+export function createApp({ bridge, robots, missions, telemetry }) {
   const app = express();
   app.use(express.json());
   app.use(prettyJson);
 
+  const byId = new Map(robots.map((r) => [r.id, r]));
+  const defaultRobot = robots[0];
+  const oneRobot = robotRoutes({ telemetry, missions });
+
   app.use("/health", healthRoutes({ bridge }));
-  app.use("/robot", robotRoutes({ robot, telemetry }));
-  app.use("/missions", missionRoutes({ missions, defaultRobotId: robot.id }));
+
+  // Fleet
+  app.get("/robots", (_req, res) => {
+    res.json({ count: robots.length, robots: robots.map((r) => r.status()) });
+  });
+  app.use(
+    "/robots/:id",
+    (req, res, next) => {
+      req.robot = byId.get(req.params.id);
+      if (!req.robot) return res.status(404).json({ error: `Unknown robot "${req.params.id}"` });
+      next();
+    },
+    oneRobot
+  );
+
+  // Legacy single-robot routes -> default robot
+  app.use("/robot", (req, _res, next) => { req.robot = defaultRobot; next(); }, oneRobot);
+
+  app.use("/missions", missionRoutes({ missions, defaultRobotId: defaultRobot.id }));
 
   // 3D / VR viewer
   app.use("/viewer", express.static(VIEWER_DIR));

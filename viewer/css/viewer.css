@@ -27,7 +27,7 @@ canvas { display: block; }
   position: fixed;
   top: 16px;
   left: 16px;
-  width: 240px;
+  width: 270px;
   padding: 12px 14px;
   background: var(--panel);
   border: 1px solid var(--border);
@@ -103,3 +103,68 @@ canvas { display: block; }
 }
 
 .empty { color: var(--muted); }
+
+/* ---------- Missions ---------- */
+:root {
+  --queued: #c9d1d9;
+  --cancelled: #6e7681;
+}
+
+.hud__section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.hud__section-title {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.missions {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mission {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mission__id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.mission__goal { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.mission--succeeded, .mission--failed, .mission--cancelled { opacity: 0.6; }
+
+.pill--queued { background: var(--queued); }
+.pill--active { background: var(--moving); }
+.pill--succeeded { background: var(--idle); }
+.pill--failed { background: var(--off); }
+.pill--cancelled { background: var(--cancelled); color: var(--text); }
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translate(-50%, -8px);
+  padding: 8px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.toast--show { opacity: 1; transform: translate(-50%, 0); }
+.toast--error { border-color: var(--off); }

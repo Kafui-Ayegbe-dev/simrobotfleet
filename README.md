@@ -1,6 +1,6 @@
 # RoboOps
 
-Robot fleet management with Node.js + ROS 2. It currently drives one simulated TurtleBot3 over HTTP, reports its position, and shows it live in a 3D viewer that also works in VR. See [docs/roadmap.md](docs/roadmap.md) for what's next and [docs/architecture.md](docs/architecture.md) for how it fits together.
+Robot fleet management with Node.js + ROS 2. It drives a simulated TurtleBot3 over HTTP, sends it on autonomous missions (it navigates to each goal by itself, one after another), and shows everything live in a 3D viewer with VR support built in. See [docs/roadmap.md](docs/roadmap.md) for what's next and [docs/architecture.md](docs/architecture.md) for how it fits together.
 
 Runs on Apple Silicon. It uses `turtlebot3_fake_node` (a kinematic sim) because Gazebo doesn't run on ARM64.
 
@@ -24,10 +24,11 @@ roboops/
     │   ├── ros/                # rosbridge client + message helpers
     │   ├── realtime/           # Socket.IO live status + mission events
     │   ├── missions/           # mission queue and lifecycle
+    │   ├── navigation/         # go-to-goal controller that drives missions
     │   ├── telemetry/          # rolling pose history
     │   └── utils/
     ├── test/                   # API tests (use the mock bridge)
-    └── tools/mock-rosbridge.js # fake ROS for testing without Docker
+    └── tools/                  # mock-rosbridge.js (fake ROS), draw-smiley.js (demo)
 ```
 
 ## Setup (one time)
@@ -44,29 +45,29 @@ cd server && npm install
 1. Start the container with `docker compose up -d`.
 2. **Start the sim**: open http://localhost:6080, open a terminal in that desktop, and run `start-sim`.
 3. **Start the server** in a Mac terminal with `cd server && npm start`. Expect `[rosbridge] connected`.
-4. **Drive it** from a second Mac terminal tab:
+4. **Open the viewer** at http://localhost:3000/viewer/ and **double-click the floor**. The robot drives itself there.
+5. **Or use the API** from a second Mac terminal tab:
 
 ```bash
-curl localhost:3000/robot/status
+curl -X POST localhost:3000/missions -H 'Content-Type: application/json' -d '{"x":1,"y":0.5}'   # go to a point
+curl localhost:3000/robots/tb3_0/status
 
-curl -X POST localhost:3000/robot/move \
+curl -X POST localhost:3000/robots/tb3_0/move \
   -H 'Content-Type: application/json' \
-  -d '{"linear":0.2,"angular":0,"durationMs":2000}'     # forward ~0.4 m
+  -d '{"linear":0.2,"angular":0,"durationMs":2000}'     # manual drive: forward ~0.4 m
 
-curl -X POST localhost:3000/robot/move \
-  -H 'Content-Type: application/json' \
-  -d '{"linear":0,"angular":1.57,"durationMs":1000}'    # turn ~90°
-
-curl -X POST localhost:3000/robot/stop
+curl -X POST localhost:3000/robots/tb3_0/stop           # emergency stop (also cancels missions)
 ```
-
-5. **Watch it** at http://localhost:3000/viewer/. You'll see the robot, its trail and its live status.
 
 Stop everything with `docker compose down`.
 
 ## 3D viewer and VR
 
 Open http://localhost:3000/viewer/ while the server is running. Drag to orbit, right-drag to pan, scroll to zoom, and tick **Follow robot** to keep the camera on it. The server pushes positions about 10 times a second over Socket.IO.
+
+- **Double-click the floor** to send the robot there as a mission.
+- **Goal markers** show each mission: white = queued, blue (pulsing) = active, green = succeeded, red = failed, grey = cancelled. A dashed line joins the robot to its current goal.
+- **The HUD** lists active and queued missions plus the last few finished ones, and a notification pops up when a mission succeeds or fails.
 
 **Viewing in VR.** Browsers only allow WebXR on `https://` or `localhost`, so a headset on your Wi-Fi needs one of these:
 
@@ -87,10 +88,12 @@ In VR, the robot area appears about 1 m in front of you at real scale, with a fl
 | Method | Path | Body | Notes |
 |---|---|---|---|
 | GET | `/health` | | Server and rosbridge connection |
-| GET | `/robot/status` | | `state` (`idle` / `moving` / `stale` / `disconnected`), pose (x, y, heading in degrees), velocity |
-| POST | `/robot/move` | `{linear, angular, durationMs}` | Limits: ±0.22 m/s, ±2.84 rad/s, ≤10 s. Auto-stops at the end. A new move replaces the current one |
-| POST | `/robot/stop` | | Immediate stop |
-| GET | `/robot/telemetry` | | Recent pose history, oldest first. `?since=` (ISO or ms) and `?limit=` (1–3000). Sampled at 5 Hz, last 10 min kept |
+| GET | `/robots` | | All robots and their status |
+| GET | `/robots/:id/status` | | `state` (`idle` / `moving` / `stale` / `disconnected`), pose (x, y, heading in degrees), velocity, and `mission` while one is running |
+| POST | `/robots/:id/move` | `{linear, angular, durationMs}` | Manual drive. Limits: ±0.22 m/s, ±2.84 rad/s, ≤10 s. Auto-stops at the end. **409 while a mission is running** |
+| POST | `/robots/:id/stop` | | **Emergency stop:** halts the robot and cancels its active and queued missions |
+| GET | `/robots/:id/telemetry` | | Recent pose history, oldest first. `?since=` (ISO or ms) and `?limit=` (1–3000). Sampled at 5 Hz, last 10 min kept |
+| | `/robot/...` | | Same as `/robots/tb3_0/...`, kept so older commands still work |
 | POST | `/missions` | `{x, y, robotId?}` | Go-to-goal mission. Goal within ±5 m. Starts if the robot is free, otherwise queues. `robotId` defaults to `tb3_0` |
 | GET | `/missions` | | All missions, newest first. Filters: `?state=` and `?robotId=` |
 | GET | `/missions/:id` | | One mission, with its state history (and `queuePosition` if queued) |
@@ -100,7 +103,7 @@ In VR, the robot area appears about 1 m in front of you at real scale, with a fl
 
 ## Missions
 
-A mission asks a robot to go to a point. Each robot runs one at a time, and the rest wait in a queue:
+A mission asks a robot to go to a point. The robot **drives itself there**, then the next queued mission starts automatically, until the queue is empty:
 
 ```
 queued ──▶ active ──▶ succeeded | failed | cancelled
@@ -113,7 +116,18 @@ curl localhost:3000/missions?state=active
 curl -X POST localhost:3000/missions/m-0001/cancel
 ```
 
-**For now, missions are tracked but don't drive the robot.** An active mission stays active until you cancel it. Milestone 3 adds the navigation that makes the robot drive to the goal and marks the mission succeeded or failed. Missions and telemetry are kept in memory, so they reset when the server restarts.
+**How it navigates:** a go-to-goal controller runs at 10 Hz. It turns on the spot if the goal is well off to the side, otherwise it drives forward while steering toward the goal, slowing as it gets close. It counts as arrived within 5 cm.
+
+**When a mission fails** (with the reason in `error`):
+- **timed out:** it took far longer than the straight-line drive should
+- **no progress:** it didn't get 2 cm closer for 5 seconds
+- **lost contact:** the robot disconnected or stopped reporting its position for 3 seconds
+
+The robot always stops when a mission ends, for whatever reason. There's no obstacle avoidance yet: the simulated world is empty.
+
+**Demo:** `node tools/draw-smiley.js --missions` queues 48 missions that trace a smiley face.
+
+Missions and telemetry are kept in memory, so they reset when the server restarts.
 
 ## Testing
 

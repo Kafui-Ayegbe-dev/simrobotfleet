@@ -23,7 +23,7 @@ export async function startStack({ mockPort, executor } = {}) {
   const telemetry = new TelemetryBuffer({ robots });
   const missions = new MissionManager({ robots, ...(executor && { executor }) });
 
-  const server = http.createServer(createApp({ bridge, robot, missions, telemetry }));
+  const server = http.createServer(createApp({ bridge, robots, missions, telemetry }));
   const realtime = attachRealtime(server, { robots, missions });
   server.listen(0);
   await once(server, "listening");

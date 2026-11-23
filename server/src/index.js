@@ -11,6 +11,7 @@ import { createApp } from "./app.js";
 import { attachRealtime } from "./realtime/socket.js";
 import { MissionManager } from "./missions/MissionManager.js";
 import { TelemetryBuffer } from "./telemetry/TelemetryBuffer.js";
+import { createGoToGoalExecutor } from "./navigation/goToGoal.js";
 
 const bridge = new RosBridge(config.rosbridgeUrl, { reconnectMs: config.rosbridgeReconnectMs });
 bridge.on("connected", () => console.log(`[rosbridge] connected to ${config.rosbridgeUrl}`));
@@ -21,10 +22,12 @@ bridge.connect();
 const robot = new Robot("tb3_0", bridge);
 const robots = [robot];
 const telemetry = new TelemetryBuffer({ robots });
-const missions = new MissionManager({ robots });
-missions.on("update", (m) => console.log(`[mission] ${m.id} ${m.state} -> (${m.goal.x}, ${m.goal.y})`));
+const missions = new MissionManager({ robots, executor: createGoToGoalExecutor() });
+missions.on("update", (m) =>
+  console.log(`[mission] ${m.id} ${m.state} -> (${m.goal.x}, ${m.goal.y})${m.error ? `: ${m.error}` : ""}`)
+);
 
-const app = createApp({ bridge, robot, missions, telemetry });
+const app = createApp({ bridge, robots, missions, telemetry });
 
 const useHttps = Boolean(config.httpsKey && config.httpsCert);
 const server = useHttps
